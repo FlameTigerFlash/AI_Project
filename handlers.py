@@ -20,8 +20,50 @@ gigachat_key = os.getenv("GIGA_CHAT_KEY")
 router = Router()
 
 
+async def main_menu(user_id:int, bot: Bot, state: FSMContext):
+    await state.clear()
+    txt = await TextBlocks.get_main_menu()
+    kb = await Keyboards.get_start_keyboard()
+    await bot.send_message(user_id, txt, reply_markup=kb)
+
+
+async def team_menu(user_id:int, bot: Bot, state: FSMContext):
+    await state.clear()
+    await state.set_state(TeamManager.default_state)
+    txt = await TextBlocks.get_team_menu()
+    kb = await Keyboards.get_team_keyboard()
+    await bot.send_message(user_id, txt, reply_markup=kb)
+
+
+async def task_menu(user_id:int, bot: Bot, state: FSMContext):
+    await state.clear()
+    await state.set_state(TaskManager.default_state)
+    txt = await TextBlocks.get_task_menu()
+    kb = await Keyboards.get_task_keyboard()
+    await bot.send_message(user_id, txt, reply_markup=kb)
+
+
+async def task_editor_menu(user_id:int, bot: Bot, state: FSMContext):
+    await state.set_state(TaskEditor.default_state)
+    txt = await TextBlocks.get_task_editor_menu()
+    kb = await Keyboards.get_task_editor_keyboard()
+    await bot.send_message(user_id, txt, reply_markup=kb)
+
+
+async def back(user_id, bot:Bot, state: FSMContext):
+    cur_state = await state.get_state()
+    if cur_state in Form.__states__:
+        await main_menu(user_id, bot, state)
+    if cur_state in TeamManager.__states__:
+        await team_menu(user_id, bot, state)
+    if cur_state in TaskManager.__states__:
+        await task_menu(user_id, bot, state)
+    if cur_state in TaskEditor.__states__:
+        await task_editor_menu(user_id, bot, state)
+
+#Функция только для разработчика.
 @router.message(Command("dev_info"))
-async def dev_info(message: Message):
+async def dev_info():
     rows = await db_get_task_employees(1)
     for row in rows:
         print(row)
@@ -41,24 +83,14 @@ async def exit_state(message: Message, state: FSMContext) -> None:
     await state.clear()
 
 
-@router.message(Command("back"))
-async def back(state: FSMContext):
-    cur_state = await state.get_state()
-    if cur_state in Form.__states__:
-        await state.clear()
-    if cur_state in TeamManager.__states__:
-        await state.clear()
-        await state.set_state(TeamManager.default_state)
-    if cur_state in TaskManager.__states__:
-        await state.clear()
-        await state.set_state(TaskManager.default_state)
-    if cur_state in TaskEditor.__states__:
-        await state.set_state(TaskEditor.default_state)
-
-
 @router.callback_query(F.data=="back")
-async def cb_back(callback: CallbackQuery, state: FSMContext):
-    await back(state)
+async def cb_back(callback: CallbackQuery,bot:Bot, state: FSMContext):
+    await back(callback.from_user.id,bot=bot, state=state)
+
+
+@router.message(Command("back"))
+async def cmd_back(message:Message, bot:Bot, state: FSMContext):
+    await back(message.from_user.id, bot, state)
 
 
 @router.message(Command("help"))
@@ -99,14 +131,14 @@ async def insert_nickname(message:Message, state: FSMContext):
 
 
 async def get_tasks(user_id:int)->str:
-    controlled_tasks = await db_get_items(table='tasks', director_id=user_id)
-    if not controlled_tasks:
+    tasks = await db_get_employee_tasks(user_id=user_id)
+    if not tasks:
         return 'На данный момент активных задач нет.'
     resp = ""
-    for row in controlled_tasks:  # Проходим по всем строкам
-        resp += (f"ID: {row[0]}, NAME: {row[2]},\nTEAM: {row[3]}\n DESCRIPTION: {row[5]}\n "
-                 f"EXECUTORS:\n {"\n".join(row[4].split(";"))}\n"
-                 f"STATUS: {row[6]}\n")
+    for row in tasks:  # Проходим по всем строкам
+        resp += (f"ID: {row[0]}, NAME: {row[2]},\nTEAM: {row[3]}\n DESCRIPTION: {row[4]}\n "
+                 f"ROLE:{row[6]}\n"
+                 f"STATUS: {row[5]}\n")
     return resp
 
 
@@ -147,13 +179,13 @@ async def set_task_name(message: Message, state: FSMContext):
 
 
 @router.message(F.text, TaskManager.setting_task_user)
-async def set_task_user(message: Message, state: FSMContext):
+async def set_task_user(message: Message, bot:Bot, state: FSMContext):
     data = await state.get_data()
     users = message.text.split(";")
     if len(users) == 0:
         await message.answer("Введите, пожалуйста, корректные имена пользователей.")
         return
-    async with aiosqlite.connect('users.db') as db:
+    async with aiosqlite.connect('../users.db') as db:
         for name in data["names"]:
             valid_users = []
             for user in users:
@@ -185,7 +217,7 @@ async def set_task_user(message: Message, state: FSMContext):
 
         await db.commit()
     await message.answer("Задачи успешно добавлены!")
-    await back(state)
+    await back(user_id=message.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='add_tasks', TaskManager.default_state)
@@ -236,14 +268,13 @@ async def set_review_id(message: Message, state:FSMContext):
 
 
 @router.message(F.text, TaskManager.setting_review_comment)
-async def set_review_comment(message: Message, state:FSMContext):
+async def set_review_comment(message: Message, bot:Bot, state:FSMContext):
     txt = message.text
     data = await state.get_data()
     await db_delete_element(table='review', task_id=data['task_id'], user_id=message.from_user.id)
     await db_insert_element(table='review', task_id=data['task_id'], user_id=message.from_user.id, comment=txt)
-    await state.clear()
-    await state.set_state(TaskManager.default_state)
     await message.answer("Отзыв успешно добавлен!")
+    await back(user_id=message.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="create_team", TeamManager.default_state)
@@ -264,7 +295,7 @@ async def create_set_team_name(message: Message, state: FSMContext):
 
 
 @router.message(F.text, TeamManager.create_awaiting_password)
-async def create_set_team_password(message: Message, state: FSMContext):
+async def create_set_team_password(message: Message, bot:Bot, state: FSMContext):
     password = message.text.strip()
     if not (5 <= len(password) <= 15):
         await message.answer("Длина пароля должна составлять от 5 до 15 символов.")
@@ -273,19 +304,18 @@ async def create_set_team_password(message: Message, state: FSMContext):
     author_data = await db_get_items(table='users', id=message.from_user.id)
     if len(author_data) != 1:
         await message.answer("К сожалению, вас нет в базе данных.")
-        await back(message, state)
+        await back(user_id=message.from_user.id, bot=bot, state=state)
         return
     exists = await db_element_exists(table='teams', name=data['table_name'])
     if exists:
         await message.answer("Команда с данным названием уже существует.")
-        await back(message, state)
+        await back(user_id=message.from_user.id, bot=bot, state=state)
         return
     await db_insert_element(table='teams', name=data['table_name'], password=password)
     await db_create_table(table=data['table_name'], id='INTEGER', name='VARCHAR(30)', admin='BOOLEAN')
     await db_insert_element(table=data['table_name'], id=message.from_user.id, name=author_data[0][1], admin="TRUE")
     await message.answer(f"Таблица команды {data['table_name']} создана.")
-    await state.clear()
-    await state.set_state(TeamManager.default_state)
+    await back(user_id=message.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="join_team", TeamManager.default_state)
@@ -307,18 +337,18 @@ async def join_set_team_name(message: Message, state: FSMContext):
 
 
 @router.message(F.text, TeamManager.join_awaiting_password)
-async def join_set_team_password(message: Message, state: FSMContext):
+async def join_set_team_password(message: Message, bot:Bot, state: FSMContext):
     password = message.text.strip()
     data = await state.get_data()
     author_data = await db_get_items(table='users', id=message.from_user.id)
     if len(author_data) != 1:
         await message.answer("К сожалению, вас нет в базе данных.")
-        await back(message, state)
+        await back(user_id=message.from_user.id, bot=bot, state=state)
         return
     member_already = await db_element_exists(table=data['team_name'], id=author_data[0][0])
     if member_already:
         await message.answer("Вы уже являетесь членом данной команды.")
-        await back(message, state)
+        await back(user_id=message.from_user.id, bot=bot, state=state)
         return
     exists = await db_element_exists(table='teams', name=data['team_name'], password=password)
     if not exists:
@@ -326,8 +356,42 @@ async def join_set_team_password(message: Message, state: FSMContext):
         return
     await db_insert_element(table=data['team_name'], id=author_data[0][0], name=author_data[0][1], admin="FALSE")
     await message.answer("Вы были добавлены в команду!")
-    await state.clear()
-    await state.set_state(TeamManager.default_state)
+    await back(user_id=message.from_user.id, bot=bot, state=state)
+
+
+@router.callback_query(F.data=='teams_list', TeamManager.default_state)
+async def teams_list(callback:CallbackQuery, bot: Bot, state:FSMContext):
+    teams = await db_get_items(table='teams')
+    if len(teams) == 0:
+        await bot.send_message(callback.from_user.id, "Список команд пуст. Вы можете создать собственную.")
+        return
+    txt = ""
+    for el in teams:
+        txt += f"{el[0]}. {el[1]}\n"
+    await bot.send_message(callback.from_user.id, txt)
+
+
+@router.callback_query(F.data=='team_members', TeamManager.default_state)
+async def req_team_members(callback:CallbackQuery, bot: Bot, state:FSMContext):
+    if not (await db_element_exists(table='teams')):
+        await bot.send_message(callback.from_user.id, "На данный момент список команд пуст.")
+        return
+    await state.set_state(TeamManager.list_awaiting_name)
+    await bot.send_message(callback.from_user.id, "Введите название интересующей вас команды.")
+
+
+@router.message(F.text, TeamManager.list_awaiting_name)
+async def show_team_members(message:Message, bot: Bot, state:FSMContext):
+    team_name = message.text
+    try:
+        members = await db_get_items(table=team_name)
+        txt = ""
+        for member in members:
+            txt += f"{"[ADMIN] " if member[2] == 'TRUE' else ""}{member[1]}\n"
+        await bot.send_message(message.from_user.id, txt)
+        await back(user_id=message.from_user.id, bot=bot, state=state)
+    except:
+        await bot.send_message(message.from_user.id, "Введите, пожалуйста, корректное название команды.")
 
 
 @router.callback_query(F.data=="get_workers")
@@ -361,7 +425,7 @@ async def task_completed(callback:CallbackQuery, bot: Bot, state:FSMContext):
     await db_insert_element(table='completion_log', task_id=data['task_id'])
     await db_finish_task(data['task_id'], success=True)
     await bot.send_message(callback.from_user.id, "Задача выполнена! Отлично!")
-    await state.set_state(TaskEditor.default_state)
+    await back(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="task_failed", TaskEditor.alter_task_status)
@@ -371,7 +435,7 @@ async def task_failed(callback:CallbackQuery, bot: Bot, state:FSMContext):
     await db_insert_element(table='completion_log', task_id=data['task_id'])
     await db_finish_task(data['task_id'], success=False)
     await bot.send_message(callback.from_user.id, "Задача провалена! Ничего страшного!")
-    await state.set_state(TaskEditor.default_state)
+    await back(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="alter_worker_status",TaskEditor.default_state)
@@ -401,7 +465,7 @@ async def set_manager(callback:CallbackQuery, bot:Bot, state:FSMContext):
     data = await state.get_data()
     await db_update_element(table='user_tasks', where={'user_id':data['user_id'], 'task_id':data['task_id']}, role='Менеджер')
     await bot.send_message(callback.from_user.id, "Сотрудник назначен менеджером.")
-    await state.set_state(TaskEditor.default_state)
+    await back(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="set_executor", TaskEditor.choosing_role)
@@ -409,73 +473,57 @@ async def set_executor(callback:CallbackQuery, bot:Bot, state:FSMContext):
     data = await state.get_data()
     await db_update_element(table='user_tasks', where={'user_id':data['user_id'], 'task_id':data['task_id']}, role='Исполнитель')
     await bot.send_message(callback.from_user.id, "Сотрудник назначен исполнителем.")
-    await state.set_state(TaskEditor.default_state)
+    await back(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=="change_task_description", TaskEditor.default_state)
 async def change_description(callback:CallbackQuery, bot:Bot, state:FSMContext):
-    data = await state.get_data()
     await state.set_state(TaskEditor.changing_description)
     await bot.send_message(callback.from_user.id, "Введите описание задачи.")
 
 
 @router.message(F.text, TaskEditor.changing_description)
-async def insert_description(message:Message, state:FSMContext):
+async def insert_description(message:Message, bot:Bot, state:FSMContext):
     data = await state.get_data()
     await db_update_element(table='tasks', where={'id':data['task_id']}, description=message.text)
-    await state.set_state(TaskEditor.changing_description)
-    await state.set_state(TaskEditor.default_state)
     await message.answer("Описание изменено.")
+    await back(user_id=message.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='main_menu')
-async def to_main_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
-    await state.clear()
-    txt = await TextBlocks.get_main_menu()
-    kb = await Keyboards.get_start_keyboard()
-    await bot.send_message(callback.from_user.id, txt, reply_markup=kb)
+async def cb_to_main_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
+    await main_menu(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='team_menu')
-async def to_team_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
-    await state.clear()
-    await state.set_state(TeamManager.default_state)
-    txt = await TextBlocks.get_team_menu()
-    kb = await Keyboards.get_team_keyboard()
-    await bot.send_message(callback.from_user.id, txt, reply_markup=kb)
+async def cb_to_team_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
+    await team_menu(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='task_menu')
-async def to_task_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
-    await state.clear()
-    await state.set_state(TaskManager.default_state)
-    txt = await TextBlocks.get_task_menu()
-    kb = await Keyboards.get_task_keyboard()
-    await bot.send_message(callback.from_user.id, txt, reply_markup=kb)
+async def cb_to_task_menu(callback:CallbackQuery, bot: Bot, state:FSMContext):
+    await task_menu(user_id=callback.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='task_editor_menu')
-async def select_task(callback:CallbackQuery, bot: Bot, state:FSMContext):
+async def cb_select_task(callback:CallbackQuery, bot: Bot, state:FSMContext):
     await state.clear()
     await state.set_state(TaskManager.selecting_task)
     await bot.send_message(callback.from_user.id, "Выберите, пожалуйста, номер интересующей задачи.")
 
 
 @router.message(F.text, TaskManager.selecting_task)
-async def to_task_edit_menu(message: Message, state: FSMContext):
-    id = int(message.text)
-    items = await db_get_items(table='tasks', id=id)
+async def cb_to_task_editor_menu(message: Message, bot:Bot, state: FSMContext):
+    task_id = int(message.text)
+    items = await db_get_items(table='tasks', id=task_id)
     if len(items) != 1:
         await message.answer("Такой задачи не существует.")
         return
     if items[0][1] != message.from_user.id:
         await message.answer("Вы не являетесь владельцем данной задачи.")
         return
-    await state.set_state(TaskEditor.default_state)
-    await state.update_data(task_id=id)
-    txt = await TextBlocks.get_task_editor_menu()
-    kb = await Keyboards.get_task_editor_keyboard()
-    await message.answer(txt, reply_markup=kb)
+    await state.update_data(task_id=task_id)
+    await task_editor_menu(user_id=message.from_user.id, bot=bot, state=state)
 
 
 @router.callback_query(F.data=='ai_review')
@@ -524,3 +572,4 @@ async def ai_review(callback:CallbackQuery, bot: Bot, state:FSMContext):
     await db_insert_element(table='prompts', user_id=user_id, type='HumanMessage', body=txt)
     await db_insert_element(table='prompts', user_id=user_id, type='AIMessage', body=response)
     await bot.send_message(user_id, response)
+    await back(user_id=callback.from_user.id, bot=bot, state=state)
