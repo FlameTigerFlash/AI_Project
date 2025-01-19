@@ -37,6 +37,7 @@ class TaskEditor(StatesGroup):
     setting_request_text = State()
     choosing_estimated_member = State()
     setting_member_comment = State()
+    setting_new_members = State()
 
 
 class Cabinet(StatesGroup):

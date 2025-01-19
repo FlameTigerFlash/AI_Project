@@ -38,10 +38,11 @@ class Keyboards:
     @staticmethod
     async def get_task_editor_keyboard():
         return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Изменить описание задачи", callback_data="change_task_description")],
             [InlineKeyboardButton(text="Изменить статус исполнителя", callback_data="alter_worker_status"),
              InlineKeyboardButton(text="Изменить статус задачи", callback_data="alter_task_status")],
-            [InlineKeyboardButton(text="Список трудящихся", callback_data="get_workers"),
-             InlineKeyboardButton(text="Изменить описание задачи", callback_data="change_task_description")],
+            [InlineKeyboardButton(text="Добавить участников", callback_data="add_new_workers"),
+             InlineKeyboardButton(text="Список трудящихся", callback_data="get_workers")],
             [InlineKeyboardButton(text="Отправить запрос менеджерам", callback_data="send_request")],
             [InlineKeyboardButton(text="Отзывы о задаче", callback_data="get_reviews"),
              InlineKeyboardButton(text="Комментировать работу участника", callback_data="estimate_member")],

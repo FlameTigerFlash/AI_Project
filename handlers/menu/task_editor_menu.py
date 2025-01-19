@@ -196,3 +196,30 @@ async def insert_member_comment(message:Message, bot:Bot, state:FSMContext):
     await db_insert_element(table='users_estimation', user_id=data['user_id'], task_id=data['task_id'], comment=comment)
     await message.answer("Комментарий успешно добавлен.")
     await task_editor_menu(message.from_user.id, bot=bot, state=state)
+
+
+@router.callback_query(F.data=='add_new_workers')
+async def add_new_workers(callback:CallbackQuery, bot:Bot, state:FSMContext):
+    await state.set_state(TaskEditor.setting_new_members)
+    await bot.send_message(callback.from_user.id,"Введите исполнителей задачи. (разделитель ;)")
+
+
+@router.message(F.text, TaskEditor.setting_new_members)
+async def set_new_members(message:Message, bot:Bot, state:FSMContext):
+    data = await state.get_data()
+    members = message.text.split(";")
+    if len(members) == 0:
+        await message.answer("Введите, пожалуйста, корректные имена пользователей.")
+        return
+    team_name = (await db_get_items(table='tasks', id=data['task_id']))[0][3]
+    cnt = 0
+    for member in members:
+        user_ids = await db_get_items(table=team_name, name=member)
+        if len(user_ids) != 1:
+            await message.answer(f"Пользователь с никнеймом {member} не найден в списке команды.")
+            continue
+        user_id = user_ids[0][0]
+        await db_insert_element(table='user_tasks', user_id=user_id, task_id=data['task_id'], role='Исполнитель')
+        cnt += 1
+    await message.answer(f"Количество добавленных участников: {cnt}.")
+    await task_editor_menu(message.from_user.id, bot=bot, state=state)
