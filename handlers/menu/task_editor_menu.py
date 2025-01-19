@@ -219,7 +219,9 @@ async def set_new_members(message:Message, bot:Bot, state:FSMContext):
             await message.answer(f"Пользователь с никнеймом {member} не найден в списке команды.")
             continue
         user_id = user_ids[0][0]
-        await db_insert_element(table='user_tasks', user_id=user_id, task_id=data['task_id'], role='Исполнитель')
-        cnt += 1
+        exists = await db_element_exists(table='user_tasks', user_id=user_id, task_id=data['task_id'])
+        if not exists:
+            await db_insert_element(table='user_tasks', user_id=user_id, task_id=data['task_id'], role='Исполнитель')
+            cnt += 1
     await message.answer(f"Количество добавленных участников: {cnt}.")
     await task_editor_menu(message.from_user.id, bot=bot, state=state)
