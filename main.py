@@ -1,6 +1,8 @@
 import asyncio
 import nest_asyncio
 import logging
+import os
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram import BaseMiddleware
@@ -8,8 +10,11 @@ from aiogram.client.default import DefaultBotProperties
 from typing import Any, Awaitable, Callable, Dict
 from aiogram.types import TelegramObject, Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from aiogram.fsm.storage.memory import MemoryStorage
+from handlers.main_router import router
 from apsched import *
-from handlers import *
+from database.database import *
+from handlers.states import Form
 
 
 nest_asyncio.apply()
@@ -22,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
+dp.include_router(router)
 
 
 class SomeMiddleware(BaseMiddleware):
@@ -53,11 +59,10 @@ class SomeMiddleware(BaseMiddleware):
 
 
 async def main(): #Основная асинхронная функция, которая будет запускаться при старте бота.
+    dp.message.outer_middleware(SomeMiddleware())
     scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
     job = scheduler.add_job(task_reminder, trigger='cron', hour = 12, minute = 0, kwargs={'bot':bot})
     scheduler.start()
-    dp.include_router(router)
-    dp.message.outer_middleware(SomeMiddleware())
     dp.startup.register(start_db)
     try:
         print("Бот запущен...")

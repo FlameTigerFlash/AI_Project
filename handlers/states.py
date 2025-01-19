@@ -25,6 +25,7 @@ class TeamManager(StatesGroup):
     join_awaiting_password = State()
     leave_awaiting_password  = State()
     delete_awaiting_name = State()
+    list_awaiting_name = State()
 
 
 class TaskEditor(StatesGroup):
