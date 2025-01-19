@@ -45,11 +45,11 @@ class SomeMiddleware(BaseMiddleware):
             print(ex)
             return
         if data['event_update'].message.text != '/start' and state != Form.waiting_for_nickname:
-            id = data['event_update'].message.chat.id
+            chat_id = data['event_update'].message.chat.id
             async with aiosqlite.connect('users.db') as db:
-                async with db.execute("SELECT id FROM users WHERE id = ?", (id,)) as cursor:
+                async with db.execute("SELECT id FROM users WHERE id = ?", (chat_id,)) as cursor:
                     if await cursor.fetchone() is None:
-                        await bot.send_message(chat_id=id, text='Вы не зарегистрированы! Зарегистрируйтесь, используя команду /start.')
+                        await bot.send_message(chat_id=chat_id, text='Вы не зарегистрированы! Зарегистрируйтесь, используя команду /start.')
                         return
         command = data['event_update'].message.text
         user_id = data['event_update'].message.from_user.id

@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 
-async def run_gigachat(gigachat_key, system_message_content, dialogue_messages, max_history_length):
+async def run_gigachat(gigachat_key, system_message_content, dialogue_messages, max_history_length=10):
     llm = GigaChat(
         credentials=gigachat_key,
         scope="GIGACHAT_API_PERS",

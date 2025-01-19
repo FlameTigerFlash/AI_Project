@@ -37,7 +37,7 @@ async def back(user_id, bot:Bot, state: FSMContext):
 #Функция только для разработчика.
 @router.message(Command("dev_info"))
 async def dev_info(message:Message):
-    rows = await db_get_items(table='communication')
+    rows = await db_get_items(table='users_estimation')
     for row in rows:
         print(row)
 

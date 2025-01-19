@@ -35,6 +35,8 @@ class TaskEditor(StatesGroup):
     choosing_role = State()
     changing_description = State()
     setting_request_text = State()
+    choosing_estimated_member = State()
+    setting_member_comment = State()
 
 
 class Cabinet(StatesGroup):
@@ -42,3 +44,4 @@ class Cabinet(StatesGroup):
     checking_notifications = State()
     choosing_task = State()
     setting_reply = State()
+    filling_form = State()

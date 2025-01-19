@@ -92,9 +92,8 @@ async def set_task_user(message: Message, bot:Bot, state: FSMContext):
             for user in users:
                 user_ids = await db_get_items(table=data['team_name'], name=user)
                 if len(user_ids) != 1:
-
-                    await message.answer(f'Пользователь {user} не найден в базе данных')
-                    continue
+                    await message.answer(f'Пользователь {user} не найден в базе данных, попробуйте ввести ещё раз.')
+                    return
                 valid_users.append(user)
 
             if len(valid_users) == 0:
@@ -195,6 +194,8 @@ async def ai_review(callback:CallbackQuery, bot: Bot, state:FSMContext):
     if len(tasks) == 0:
         await bot.send_message(user_id, "Завершённых задач на данный момент нет.")
         return
+    if len(tasks) > 5:
+        tasks = tasks[len(tasks)-5:]
     dialogue = []
     system_prompt = (f"Ты являешься экспертом в области управления задачами и организации командной работы,"
                      f" при анализе делающим упор на статистику и способным обнаружить сильные и слабые места стратегии.")
@@ -226,6 +227,12 @@ async def ai_review(callback:CallbackQuery, bot: Bot, state:FSMContext):
                 txt += f"Без отзыва\n"
             else:
                 txt += f"Отзыв: {worker_comment}"
+        comms = await db_get_items(table='communication', task_id=task_id)
+        txt += "Коммуникация по задаче (директора с командой):\n"
+        for msg in comms:
+            msg_type, body = msg[1], msg[2]
+            txt += "Директор: " if msg_type == 'Запрос' else "Команда: "
+            txt += f"{body}\n"
         #print(txt)
         dialogue.append(HumanMessage(content=txt))
         await bot.send_message(user_id, f"Анализируем задачу {task[0]}...")

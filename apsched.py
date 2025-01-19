@@ -29,3 +29,8 @@ async def task_reminder(bot: Bot):
                 break
         if exists:
             await bot.send_message(user_row[0], text="Уведомления требуют Вашего внимания! Подробнее в личном кабинете.")
+        signed_form  = await db_element_exists(table='form', user_id=user_row[0])
+        if not signed_form:
+            await bot.send_message(user_row[0],
+                                   text="Если Вам не трудно, заполните, пожалуйста, анкету в личном кабинете. "
+                                        "Это поможет развитию бота в дальнейшем.")

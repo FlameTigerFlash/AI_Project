@@ -71,6 +71,21 @@ async def start_db():
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
         ''')
+        await db.execute('''
+                CREATE TABLE IF NOT EXISTS users_estimation (
+                    user_id INTEGER,
+                    comment TEXT,
+                    task_id INTEGER,
+                    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                    );
+                ''')
+        await db.execute(''' CREATE TABLE IF NOT EXISTS form (
+                    user_id INTEGER,
+                    comment TEXT,
+                    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+                    );
+                ''')
         await db.commit()
 
 
@@ -186,10 +201,12 @@ async def db_get_task_employees(task_id: int) -> list:
 async def db_get_employee_tasks(user_id:int) -> list:
     async with aiosqlite.connect('users.db') as db:
         query = ("""
-            SELECT tasks.id, tasks.director_id, tasks.name, tasks.team, tasks.description, tasks.status, user_tasks.role
+            SELECT tasks.id, tasks.director_id, tasks.name, tasks.team, tasks.description, tasks.status, user_tasks.role, review.comment, users_estimation.comment
             FROM tasks
             INNER JOIN user_tasks ON tasks.id = user_tasks.task_id
             INNER JOIN users ON user_tasks.user_id = users.id
+            LEFT JOIN review ON review.task_id = tasks.id AND review.user_id = users.id
+            LEFT JOIN users_estimation ON users_estimation.task_id = tasks.id AND users_estimation.user_id = users.id
             WHERE users.id = ?
         """)
         async with db.execute(query, (user_id,)) as cursor:
@@ -264,7 +281,8 @@ async def db_clear_notifications(user_id:int):
         query = ("""
                     UPDATE communication 
                     SET resolved = 'TRUE' 
-                    WHERE task_id IN (SELECT task_id FROM user_tasks WHERE user_id = ? AND role = 'Менеджер')
+                    WHERE communication.type = 'Ответ' AND communication.task_id IN 
+                    (SELECT id FROM tasks WHERE director_id = ?)
                 """)
         await db.execute(query, (user_id,))
         await db.commit()

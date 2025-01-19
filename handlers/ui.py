@@ -43,8 +43,11 @@ class Keyboards:
             [InlineKeyboardButton(text="Список трудящихся", callback_data="get_workers"),
              InlineKeyboardButton(text="Изменить описание задачи", callback_data="change_task_description")],
             [InlineKeyboardButton(text="Отправить запрос менеджерам", callback_data="send_request")],
+            [InlineKeyboardButton(text="Отзывы о задаче", callback_data="get_reviews"),
+             InlineKeyboardButton(text="Комментировать работу участника", callback_data="estimate_member")],
             [InlineKeyboardButton(text="В меню задач", callback_data="task_menu")]
         ])
+
 
     @staticmethod
     async def get_task_completion_keyboard():
@@ -53,6 +56,7 @@ class Keyboards:
              [InlineKeyboardButton(text="Задача провалена", callback_data="task_failed")],
             [InlineKeyboardButton(text="Обратно в меню управления задачей", callback_data="back")]
         ])
+
 
     @staticmethod
     async def get_worker_status_keyboard():
@@ -66,6 +70,7 @@ class Keyboards:
     @staticmethod
     async def get_cabinet_keyboard():
         return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Заполнить анкету", callback_data="fill_out_form")],
             [InlineKeyboardButton(text="Моя статистика", callback_data="get_stats"),
              InlineKeyboardButton(text="Уведомления", callback_data="get_notifications")],
             [InlineKeyboardButton(text="Текущие задачи", callback_data="get_current_tasks"),
