@@ -149,3 +149,50 @@ async def insert_request_text(message:Message, bot:Bot, state:FSMContext):
             await bot.send_message(worker[0], f'Получен запрос касательно задания {data['task_id']} '
                                               f'Подробнее можете посмотреть в своём личном кабинете.')
     await task_editor_menu(message.from_user.id, bot=bot, state=state)
+
+
+@router.callback_query(F.data=='get_reviews')
+async def get_reviews(callback:CallbackQuery, bot:Bot, state:FSMContext):
+    data = await state.get_data()
+    members = await db_get_task_employees(task_id=data['task_id'])
+    txt = ""
+    for el in members:
+        if el[5] is None:
+            continue
+        txt += f"Никнейм: {el[1]}, роль: {el[4]}\nОтзыв:{el[5]}\n"
+    if len(txt) == 0:
+        txt = "На данный момент отзывов нет."
+    await bot.send_message(callback.from_user.id, text=txt)
+    await task_editor_menu(callback.from_user.id,  bot=bot, state=state)
+
+
+@router.callback_query(F.data=='estimate_member')
+async def estimate_member(callback:CallbackQuery, bot:Bot, state:FSMContext):
+    await state.set_state(TaskEditor.choosing_estimated_member)
+    await bot.send_message(callback.from_user.id, "Введите, пожалуйста, никнейм участника.")
+
+
+@router.message(F.text, TaskEditor.choosing_estimated_member)
+async def insert_estimated_member(message:Message, state:FSMContext):
+    data = await state.get_data()
+    workers = await db_get_items(table='users', name=message.text)
+    if len(workers) != 1 or not (
+    await db_element_exists(table='user_tasks', user_id=workers[0][0], task_id=data['task_id'])):
+        await message.answer("Данного пользователя нет в списке участников проекта.")
+        return
+    if (await db_get_items(table='user_tasks', user_id=workers[0][0], task_id=data['task_id']))[0][1] == 'Директор':
+        await message.answer("Данный пользователь является директором задачи.")
+        return
+    await state.update_data(user_id = workers[0][0])
+    await state.set_state(TaskEditor.setting_member_comment)
+    await message.answer("Введите комментарий о сотруднике (по возможности он заместит имеющийся).")
+
+
+@router.message(F.text, TaskEditor.setting_member_comment)
+async def insert_member_comment(message:Message, bot:Bot, state:FSMContext):
+    data = await state.get_data()
+    comment = message.text
+    await db_delete_element(table='users_estimation', user_id=data['user_id'], task_id=data['task_id'])
+    await db_insert_element(table='users_estimation', user_id=data['user_id'], task_id=data['task_id'], comment=comment)
+    await message.answer("Комментарий успешно добавлен.")
+    await task_editor_menu(message.from_user.id, bot=bot, state=state)

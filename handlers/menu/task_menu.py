@@ -226,6 +226,12 @@ async def ai_review(callback:CallbackQuery, bot: Bot, state:FSMContext):
                 txt += f"Без отзыва\n"
             else:
                 txt += f"Отзыв: {worker_comment}"
+        comms = await db_get_items(table='communication', task_id=task_id)
+        txt += "Коммуникация по задаче (директора с командой):\n"
+        for msg in comms:
+            msg_type, body = msg[1], msg[2]
+            txt += "Директор: " if msg_type == 'Запрос' else "Команда: "
+            txt += f"{body}\n"
         #print(txt)
         dialogue.append(HumanMessage(content=txt))
         await bot.send_message(user_id, f"Анализируем задачу {task[0]}...")

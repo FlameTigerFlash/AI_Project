@@ -5,6 +5,10 @@ from aiogram import Bot
 from database.database import *
 from handlers.ui import *
 from handlers.states import *
+from langchain_core.messages import HumanMessage, AIMessage
+from llmbot import run_gigachat
+import os
+from dotenv import load_dotenv
 
 
 router = Router()
@@ -49,19 +53,27 @@ async def get_stats(callback:CallbackQuery, bot: Bot, state:FSMContext):
     failed_tasks = []
     completed_tasks = []
     for task in tasks:
-        task_id, task_director_id, task_name, task_team, task_description, task_status, user_tasks_role = task[:7]
+        task_id, task_director_id, task_name, task_team, task_description, task_status, user_tasks_role, review_comment, users_estimation_comment = task[:9]
         if task_status == 'IN_PROCESS':
             continue
         elif task_status == 'ВЫПОЛНЕНО':
-            completed_tasks.append((task_id, task_name))
+            completed_tasks.append((task_id, task_director_id, task_name, task_description, review_comment, users_estimation_comment))
         else:
-            failed_tasks.append((task_id, task_name))
+            failed_tasks.append((task_id, task_director_id, task_name, task_description, review_comment, users_estimation_comment))
     txt += 'Выполненные задачи:\n'
     for el in completed_tasks:
-        txt += f"Задача {el[0]}: {el[1]}\n"
+        txt += (f"Задача {el[0]}: {el[2]}\n"
+                f"Описание: {el[3]}\n"
+                f"Ваш отзыв: {el[4]}\n")
+        if callback.from_user.id != el[1]:
+            txt += f"Отзыв руководителя о Вас: {el[5]}\n"
     txt += 'Проваленные задачи:\n'
     for el in failed_tasks:
-        txt += f"Задача {el[0]}: {el[1]}\n"
+        txt += (f"Задача {el[0]}: {el[2]}\n"
+                f"Описание: {el[3]}\n"
+                f"Ваш отзыв: {el[4]}\n")
+        if callback.from_user.id != el[1]:
+            txt += f"Отзыв руководителя о Вас: {el[5]}\n"
     await bot.send_message(callback.from_user.id, text=txt)
     await cabinet_menu(callback.from_user.id, bot=bot, state=state)
 
@@ -136,3 +148,33 @@ async def set_reply(message:Message, bot:Bot, state:FSMContext):
 async def read_all_notifications(callback:CallbackQuery, bot:Bot, state:FSMContext):
     await db_clear_notifications(user_id=callback.from_user.id)
     await bot.send_message(callback.from_user.id, "Уведомления очищены.")
+
+
+@router.callback_query(F.data=='get_ai_self_review')
+async def get_ai_self_review(callback:CallbackQuery, bot:Bot, state:FSMContext):
+    system_prompt = (f"Ты являешься экспертом в области управления задачами и организации командной работы,"
+                     f" при анализе делающим упор на статистику и способным обнаружить сильные и слабые места стратегии.")
+    tasks = await db_get_employee_tasks(user_id=callback.from_user.id)
+    if len(tasks) == 0:
+        await bot.send_message(callback.from_user.id, "Завершённых задач нет.")
+        return
+    txt = ("Проанализируй, пожалуйста, мою статистику, мои выполненные и проваленные задачи и дай рекомендации для будущей работы."
+           "Список задач:\n")
+    for task in tasks:
+        task_id, task_director_id, task_name, task_team, task_description, task_status, user_tasks_role, review_comment, users_estimation_comment = task[:9]
+        if task_status == 'IN_PROCESS':
+            continue
+        txt += (f"Задача {task_id} - {task_name}\n"
+                f"Описание: {task_description}\n"
+                f"Задание {task_status.capitalize()}\n"
+                f"Роль участника: {user_tasks_role}\n"
+                f"Отзыв участника: {review_comment}\n")
+        if callback.from_user.id != task_director_id:
+            txt += f"Комментарий руководителя об участнике: {users_estimation_comment}\n"
+    load_dotenv()
+    gigachat_key = os.getenv("GIGA_CHAT_KEY")
+    dialogue = [HumanMessage(txt)]
+    #print(txt)
+    await bot.send_message(callback.from_user.id, "Анализ в процессе...")
+    response = await run_gigachat(gigachat_key=gigachat_key, dialogue_messages=dialogue, system_message_content=system_prompt, max_history_length=2)
+    await bot.send_message(callback.from_user.id, response)
