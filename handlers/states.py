@@ -34,3 +34,11 @@ class TaskEditor(StatesGroup):
     choosing_worker = State()
     choosing_role = State()
     changing_description = State()
+    setting_request_text = State()
+
+
+class Cabinet(StatesGroup):
+    default_state = State()
+    checking_notifications = State()
+    choosing_task = State()
+    setting_reply = State()

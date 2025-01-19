@@ -10,6 +10,7 @@ from handlers.menu.main_menu import main_menu, router as main_menu_router
 from handlers.menu.team_menu import team_menu, router as team_menu_router
 from handlers.menu.task_menu import task_menu, router as task_menu_router
 from handlers.menu.task_editor_menu import task_editor_menu, router as task_editor_menu_router
+from handlers.menu.cabinet_menu import cabinet_menu, router as cabinet_menu_router
 
 
 router = Router()
@@ -17,6 +18,7 @@ router.include_router(main_menu_router)
 router.include_router(team_menu_router)
 router.include_router(task_menu_router)
 router.include_router(task_editor_menu_router)
+router.include_router(cabinet_menu_router)
 
 
 async def back(user_id, bot:Bot, state: FSMContext):
@@ -29,11 +31,13 @@ async def back(user_id, bot:Bot, state: FSMContext):
         await task_menu(user_id, bot, state)
     if cur_state in TaskEditor.__states__:
         await task_editor_menu(user_id, bot, state)
+    if cur_state in Cabinet.__states__:
+        await cabinet_menu(user_id, bot, state)
 
 #Функция только для разработчика.
 @router.message(Command("dev_info"))
 async def dev_info(message:Message):
-    rows = await db_get_items(table='command_log')
+    rows = await db_get_items(table='communication')
     for row in rows:
         print(row)
 

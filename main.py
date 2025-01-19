@@ -61,7 +61,7 @@ class SomeMiddleware(BaseMiddleware):
 async def main(): #Основная асинхронная функция, которая будет запускаться при старте бота.
     dp.message.outer_middleware(SomeMiddleware())
     scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
-    job = scheduler.add_job(task_reminder, trigger='cron', hour = 12, minute = 0, kwargs={'bot':bot})
+    job = scheduler.add_job(task_reminder, trigger='cron', hour = 12, minute = 00, kwargs={'bot':bot})
     scheduler.start()
     dp.startup.register(start_db)
     try:
