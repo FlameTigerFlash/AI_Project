@@ -124,3 +124,28 @@ async def insert_description(message:Message, bot:Bot, state:FSMContext):
     await db_update_element(table='tasks', where={'id':data['task_id']}, description=message.text)
     await message.answer("Описание изменено.")
     await task_editor_menu(user_id=message.from_user.id, bot=bot, state=state)
+
+
+@router.callback_query(F.data=="send_request", TaskEditor.default_state)
+async def send_request(callback:CallbackQuery, bot:Bot, state:FSMContext):
+    await bot.send_message(callback.from_user.id, "Введите, пожалуйста, текст запроса. "
+                                                  "Если активный запрос существует, он будет замещён.")
+    await state.set_state(TaskEditor.setting_request_text)
+
+
+@router.message(F.text, TaskEditor.setting_request_text)
+async def insert_request_text(message:Message, bot:Bot, state:FSMContext):
+    data = await state.get_data()
+    body = message.text
+    exists = await db_element_exists(table='communication', task_id=data['task_id'], type='Запрос', resolved='FALSE')
+    if exists:
+        await db_update_element(table='communication', where={'task_id':data['task_id'],'type':'Запрос', 'resolved':'FALSE'}, body=body)
+    else:
+        await db_insert_element(table='communication', task_id=data['task_id'],  type = 'Запрос', resolved = 'FALSE', body=body)
+    await message.answer("Запрос успешно добавлен!")
+    workers = await db_get_task_employees(task_id=data['task_id'])
+    for worker in workers:
+        if worker[4] == 'Менеджер':
+            await bot.send_message(worker[0], f'Получен запрос касательно задания {data['task_id']} '
+                                              f'Подробнее можете посмотреть в своём личном кабинете.')
+    await task_editor_menu(message.from_user.id, bot=bot, state=state)

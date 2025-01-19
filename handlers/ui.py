@@ -5,9 +5,9 @@ class Keyboards:
     @staticmethod
     async def get_start_keyboard():
         return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="В личный кабинет", callback_data="cabinet_menu")],
             [InlineKeyboardButton(text="В меню команд", callback_data="team_menu"),
              InlineKeyboardButton(text="В меню задач", callback_data="task_menu")],
-            [InlineKeyboardButton(text="Отчёт ИИ по прошедшим задачам.", callback_data="ai_review")],
             [InlineKeyboardButton(text="Справка", callback_data="help")]
         ])
 
@@ -19,6 +19,7 @@ class Keyboards:
              InlineKeyboardButton(text="Создать задачу", callback_data="add_tasks")],
             [InlineKeyboardButton(text="Написать отзыв", callback_data="write_review")],
             [InlineKeyboardButton(text="Редактировать задание", callback_data="task_editor_menu")],
+            [InlineKeyboardButton(text="Отчёт ИИ по прошедшим задачам.", callback_data="ai_review")],
             [InlineKeyboardButton(text="В главное меню", callback_data="main_menu")]
         ])
 
@@ -41,6 +42,7 @@ class Keyboards:
              InlineKeyboardButton(text="Изменить статус задачи", callback_data="alter_task_status")],
             [InlineKeyboardButton(text="Список трудящихся", callback_data="get_workers"),
              InlineKeyboardButton(text="Изменить описание задачи", callback_data="change_task_description")],
+            [InlineKeyboardButton(text="Отправить запрос менеджерам", callback_data="send_request")],
             [InlineKeyboardButton(text="В меню задач", callback_data="task_menu")]
         ])
 
@@ -61,6 +63,26 @@ class Keyboards:
         ])
 
 
+    @staticmethod
+    async def get_cabinet_keyboard():
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Моя статистика", callback_data="get_stats"),
+             InlineKeyboardButton(text="Уведомления", callback_data="get_notifications")],
+            [InlineKeyboardButton(text="Текущие задачи", callback_data="get_current_tasks"),
+             InlineKeyboardButton(text="Отчёт ИИ", callback_data="get_ai_self_review")],
+            [InlineKeyboardButton(text="В главное меню", callback_data="main_menu")]
+        ])
+
+
+    @staticmethod
+    async def get_notifications_keyboard():
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Прочитать все", callback_data="read_all_notifications"),
+             InlineKeyboardButton(text="Ответить", callback_data="answer_notification")],
+            [InlineKeyboardButton(text="Вернуться в личный кабинет", callback_data="cabinet_menu")]
+        ])
+
+
 class TextBlocks:
     @staticmethod
     async def get_main_menu():
@@ -76,12 +98,13 @@ class TextBlocks:
                 "с целью повышения эффективности дальнейших действий.\n"
                 "Немного о моих командах.\n"
                 "/start - зарегистрироваться и начать использование бота.\n"
-                "/back - вернуться в текущее меню, прервав ввод параметров.\n"
+                "/back - вернуться в текущее меню, прервав ввод параметров. В случае возникновения зависаний/"
+                "непредвиденных затруднений всегда стоит вернуться в меню.\n"
                 "/help - получить справку (на случай, если она ещё раз или два Вам понадобится).\n"
                 "Для удобства участники разделены по группам. В меню команд вы можете создать собственную команду "
                 "или присоединиться к уже существующей, введя корректный пароль.\n"
                 "Будучи руководителем команды, Вы можете создавать задачи. Для этого следует ввести команду (организацию), "
-                "к которой будет относиться данная задача, задать её название и назначить участников. Вы по умолчанию"
+                "к которой будет относиться данная задача, задать её название и назначить участников. Вы по умолчанию "
                 "участвуете в задаче с неизменяемой ролью  директора.\n"
                 "Для более тонкой настройки следует перейти в меню редактирования задачи, выбрав номер интересующего Вас таска."
                 "Здесь Вы можете изменить описание задачи и роли исполнителей, посмотреть список трудящихся или "
@@ -109,3 +132,15 @@ class TextBlocks:
     async def get_task_editor_menu():
         return ("Вы находитесь в меню управления задачей.\n"
                 "Вы можете изменить статус участников, завершить задание и назначить роли.")
+
+
+    @staticmethod
+    async def get_cabinet_menu():
+        return ("Добро пожаловать в личный кабинет! Здесь Вы можете получить статистику, прочесть уведомления, ответить на запрос, "
+                "если являетесь менеджером задания, а также провести компьютерный анализ.")
+
+
+    @staticmethod
+    async def get_notifications_menu():
+        return ("Вы можете прочитать уведомления от менеджеров (все сразу), "
+                "ответить на запрос директора, если являетесь менеджером, или вернуться в меню личного кабинета.")

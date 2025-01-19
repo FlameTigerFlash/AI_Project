@@ -49,6 +49,15 @@ async def start_db():
                 )
         ''')
         await db.execute('''
+                CREATE TABLE IF NOT EXISTS communication (
+                    task_id INTEGER,
+                    type VARCHAR(30),
+                    body TEXT,
+                    resolved BOOLEAN,
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                )
+                ''')
+        await db.execute('''
                 CREATE TABLE IF NOT EXISTS completion_log (
                     task_id INTEGER,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -60,14 +69,6 @@ async def start_db():
                     user_id INTEGER NOT NULL,
                     command VARCHAR(255) NOT NULL,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                    );
-        ''')
-        await db.execute('''
-                CREATE TABLE IF NOT EXISTS prompts (
-                    user_id INTEGER NOT NULL,
-                    type VARCHAR(30),
-                    body TEXT,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
         ''')
         await db.commit()
@@ -167,7 +168,7 @@ async def db_update_element(table: str, where: dict, **kwargs) -> None:
         await db.commit()
 
 
-async def db_get_task_employees(task_id) -> list:
+async def db_get_task_employees(task_id: int) -> list:
     async with aiosqlite.connect('users.db') as db:
         query = ("""
             SELECT users.id, users.name, users.completed, users.failed, user_tasks.role, review.comment
@@ -182,7 +183,7 @@ async def db_get_task_employees(task_id) -> list:
             return rows
 
 
-async def db_get_employee_tasks(user_id) -> list:
+async def db_get_employee_tasks(user_id:int) -> list:
     async with aiosqlite.connect('users.db') as db:
         query = ("""
             SELECT tasks.id, tasks.director_id, tasks.name, tasks.team, tasks.description, tasks.status, user_tasks.role
@@ -216,4 +217,54 @@ async def db_finish_task(task_id: int, success: bool) -> None:
             """
 
         await db.execute(query, (task_id,))
+        await db.commit()
+
+
+async def db_get_notifications(user_id:int):
+    async with aiosqlite.connect('users.db') as db:
+        rows = []
+        query = ("""
+                    SELECT tasks.id, tasks.name, communication.type, communication.body
+                    FROM tasks
+                    INNER JOIN user_tasks ON tasks.id = user_tasks.task_id
+                    INNER JOIN communication ON tasks.id = communication.task_id
+                    WHERE user_tasks.user_id = ? AND user_tasks.role = 'Директор' AND communication.type = 'Ответ' AND communication.resolved = 'FALSE'
+                """)
+        async with db.execute(query, (user_id,)) as cursor:
+            managers_answers = await cursor.fetchall()
+            rows.extend(managers_answers)
+        query = ("""
+                    SELECT tasks.id, tasks.name, communication.type, communication.body
+                    FROM tasks
+                    INNER JOIN user_tasks ON tasks.id = user_tasks.task_id
+                    INNER JOIN communication ON tasks.id = communication.task_id
+                    WHERE user_tasks.user_id = ? AND user_tasks.role = 'Менеджер' AND communication.type = 'Запрос' AND communication.resolved = 'FALSE'
+                """)
+        async with db.execute(query, (user_id,)) as cursor:
+            directors_requests = await cursor.fetchall()
+            rows.extend(directors_requests)
+        query = ("""
+                    SELECT tasks.id, tasks.name, communication.type, communication.body
+                    FROM tasks
+                    INNER JOIN user_tasks ON tasks.id = user_tasks.task_id
+                    INNER JOIN communication ON tasks.id = communication.task_id
+                    WHERE user_tasks.user_id = ? AND user_tasks.role = 'Директор' AND communication.type = 'Запрос' AND communication.resolved = 'FALSE'
+                """)
+        async with db.execute(query, (user_id,)) as cursor:
+            outcoming_requests = await cursor.fetchall()
+            for i,el in enumerate(outcoming_requests):
+                el = [el[j] if j != 2 else 'Исходящий' for j in range(len(el))]
+                outcoming_requests[i] = el
+            rows.extend(outcoming_requests)
+        return rows
+
+
+async def db_clear_notifications(user_id:int):
+    async with aiosqlite.connect('users.db') as db:
+        query = ("""
+                    UPDATE communication 
+                    SET resolved = 'TRUE' 
+                    WHERE task_id IN (SELECT task_id FROM user_tasks WHERE user_id = ? AND role = 'Менеджер')
+                """)
+        await db.execute(query, (user_id,))
         await db.commit()
